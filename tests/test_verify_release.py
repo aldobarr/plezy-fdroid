@@ -38,7 +38,7 @@ abi = apk.stem
 codes = {tool_version_codes!r}
 if mode == "aapt2":
     print("package: name='com.edde746.plezy' versionCode='%s' versionName='2.9.1'" % codes[abi])
-    print("sdkVersion:'25'")
+    print("minSdkVersion:'25'")
     print("targetSdkVersion:'36'")
     print("native-code: '%s'" % abi)
 elif mode == "apksigner":
@@ -140,6 +140,13 @@ class VerifyReleaseCommandTest(unittest.TestCase):
             self.assertEqual(
                 VERSION_CODES,
                 {item["abi"]: item["version_code"] for item in verified["apks"]},
+            )
+            self.assertEqual(
+                {(abi, 25, 36) for abi in VERSION_CODES},
+                {
+                    (item["abi"], item["min_sdk"], item["target_sdk"])
+                    for item in verified["apks"]
+                },
             )
             self.assertEqual(
                 {f"com.edde746.plezy_{code}.apk" for code in VERSION_CODES.values()},

@@ -74,11 +74,13 @@ def _parse_badging(output: str) -> dict[str, Any]:
     native_codes = (
         re.findall(r"'([^']+)'", native_match.group(1)) if native_match else []
     )
+    min_sdk = quoted_value("minSdkVersion") or quoted_value("sdkVersion")
+
     return {
         "package_id": attributes.get("name"),
         "version_code": version_code,
         "version_name": attributes.get("versionName"),
-        "min_sdk": int(value) if (value := quoted_value("sdkVersion")) else None,
+        "min_sdk": int(min_sdk) if min_sdk else None,
         "target_sdk": (
             int(value) if (value := quoted_value("targetSdkVersion")) else None
         ),
