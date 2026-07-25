@@ -1,0 +1,266 @@
+name: Publish F-Droid repository
+
+on:
+  schedule:
+    - cron: "17 1,7,13,19 * * *"
+  workflow_dispatch:
+    inputs:
+      force_refresh:
+        description: Rebuild and deploy signed indexes even if they are fresh
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: plezy-fdroid-pages
+  cancel-in-progress: false
+
+env:
+  ANDROID_BUILD_TOOLS_VERSION: "36.0.0"
+  FDROIDSERVER_VERSION: "2.4.5"
+
+jobs:
+  build:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    environment: fdroid-signing
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.fetch.outputs.publish }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned tooling
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Install pinned Android build tools
+        run: sdkmanager "build-tools;${ANDROID_BUILD_TOOLS_VERSION}"
+
+      - name: Inspect latest stable upstream release
+        id: fetch
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FORCE_REFRESH: ${{ inputs.force_refresh }}
+        run: |
+          set -euo pipefail
+          arguments=(
+            --output-dir "$RUNNER_TEMP/release"
+            --refresh-after-days 6
+          )
+          if [[ "$FORCE_REFRESH" == "true" ]]; then
+            arguments+=(--force-refresh)
+          fi
+          python scripts/fetch_release.py "${arguments[@]}"
+          publish="$(python -c 'import json,sys; print(str(json.load(open(sys.argv[1], encoding="utf-8"))["publish"]).lower())' "$RUNNER_TEMP/release/release.json")"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare isolated F-Droid workspace
+        if: steps.fetch.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p \
+            "$RUNNER_TEMP/fdroid/config" \
+            "$RUNNER_TEMP/fdroid/repo" \
+            "$RUNNER_TEMP/fdroid/metadata/com.edde746.plezy/en-US/phoneScreenshots" \
+            "$RUNNER_TEMP/public"
+          cp config.yml "$RUNNER_TEMP/fdroid/config.yml"
+          cp config/*.yml "$RUNNER_TEMP/fdroid/config/"
+          cp metadata/com.edde746.plezy.yml "$RUNNER_TEMP/fdroid/metadata/"
+          cp metadata/com.edde746.plezy/en-US/*.txt \
+            "$RUNNER_TEMP/fdroid/metadata/com.edde746.plezy/en-US/"
+          cp assets/icon.png "$RUNNER_TEMP/fdroid/fdroid-icon.png"
+          cp assets/icon.png \
+            "$RUNNER_TEMP/fdroid/metadata/com.edde746.plezy/en-US/icon.png"
+          cp assets/screenshot.png \
+            "$RUNNER_TEMP/fdroid/metadata/com.edde746.plezy/en-US/phoneScreenshots/1.png"
+
+      - name: Verify all upstream APKs
+        if: steps.fetch.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify_release.py \
+            --manifest "$RUNNER_TEMP/release/release.json" \
+            --output-manifest "$RUNNER_TEMP/verified.json" \
+            --repo-dir "$RUNNER_TEMP/fdroid/repo" \
+            --aapt2 "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION/aapt2" \
+            --apksigner "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION/apksigner"
+
+      - name: Restore repository signing key
+        if: steps.fetch.outputs.publish == 'true'
+        shell: bash
+        env:
+          FDROID_KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_B64 }}
+          FDROID_KEYSTORE_PASSWORD: ${{ secrets.FDROID_KEYSTORE_PASSWORD }}
+          FDROID_KEY_PASSWORD: ${{ secrets.FDROID_KEY_PASSWORD }}
+          FDROID_KEY_ALIAS: ${{ secrets.FDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          : "${FDROID_KEYSTORE_B64:?FDROID_KEYSTORE_B64 is required}"
+          : "${FDROID_KEYSTORE_PASSWORD:?FDROID_KEYSTORE_PASSWORD is required}"
+          : "${FDROID_KEY_PASSWORD:?FDROID_KEY_PASSWORD is required}"
+          : "${FDROID_KEY_ALIAS:?FDROID_KEY_ALIAS is required}"
+          printf '%s' "$FDROID_KEYSTORE_B64" \
+            | base64 --decode > "$RUNNER_TEMP/fdroid-repository-key.p12"
+          chmod 600 "$RUNNER_TEMP/fdroid-repository-key.p12"
+
+      - name: Verify repository signing identity
+        if: steps.fetch.outputs.publish == 'true'
+        id: repository_identity
+        shell: bash
+        env:
+          FDROID_KEYSTORE_PASSWORD: ${{ secrets.FDROID_KEYSTORE_PASSWORD }}
+          FDROID_KEY_ALIAS: ${{ secrets.FDROID_KEY_ALIAS }}
+          EXPECTED_REPOSITORY_FINGERPRINT: ${{ vars.FDROID_REPOSITORY_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          expected="$(
+            printf '%s' "$EXPECTED_REPOSITORY_FINGERPRINT" \
+              | tr -d ':[:space:]' \
+              | tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::FDROID_REPOSITORY_FINGERPRINT must be a SHA-256 fingerprint."
+            exit 1
+          fi
+
+          keytool -exportcert \
+            -keystore "$RUNNER_TEMP/fdroid-repository-key.p12" \
+            -alias "$FDROID_KEY_ALIAS" \
+            -storepass:env FDROID_KEYSTORE_PASSWORD \
+            -file "$RUNNER_TEMP/fdroid-repository-cert.der"
+          actual="$(
+            sha256sum "$RUNNER_TEMP/fdroid-repository-cert.der" \
+              | cut -d' ' -f1
+          )"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Restored repository key fingerprint does not match the configured identity."
+            exit 1
+          fi
+          echo "fingerprint=$actual" >> "$GITHUB_OUTPUT"
+
+      - name: Generate and sign F-Droid indexes
+        if: steps.fetch.outputs.publish == 'true'
+        working-directory: ${{ runner.temp }}/fdroid
+        env:
+          FDROID_KEYSTORE_PATH: ${{ runner.temp }}/fdroid-repository-key.p12
+          FDROID_KEYSTORE_PASSWORD: ${{ secrets.FDROID_KEYSTORE_PASSWORD }}
+          FDROID_KEY_PASSWORD: ${{ secrets.FDROID_KEY_PASSWORD }}
+          FDROID_KEY_ALIAS: ${{ secrets.FDROID_KEY_ALIAS }}
+        run: |
+          export FDROID_APKSIGNER_PATH="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS_VERSION/apksigner"
+          fdroid update --delete-unknown --pretty
+
+      - name: Validate generated repository
+        if: steps.fetch.outputs.publish == 'true'
+        run: >-
+          python scripts/validate_repository.py
+          --fdroid-root "$RUNNER_TEMP/fdroid"
+          --manifest "$RUNNER_TEMP/verified.json"
+          --repo-fingerprint "${{ steps.repository_identity.outputs.fingerprint }}"
+          --jarsigner jarsigner
+          --keytool keytool
+
+      - name: Assemble complete Pages artifact
+        if: steps.fetch.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/public/fdroid"
+          cp -R "$RUNNER_TEMP/fdroid/repo" "$RUNNER_TEMP/public/fdroid/repo"
+          python scripts/build_landing_page.py \
+            --manifest "$RUNNER_TEMP/verified.json" \
+            --repo-fingerprint "${{ steps.repository_identity.outputs.fingerprint }}" \
+            --fdroidserver-version "$FDROIDSERVER_VERSION" \
+            --template site/index.html.tmpl \
+            --assets-dir assets \
+            --output-dir "$RUNNER_TEMP/public"
+
+      - name: Upload complete Pages artifact
+        if: steps.fetch.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ runner.temp }}/public
+          include-hidden-files: true
+
+      - name: Remove restored signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f \
+            "$RUNNER_TEMP/fdroid-repository-key.p12" \
+            "$RUNNER_TEMP/fdroid-repository-cert.der"
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy atomically to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+  report:
+    needs:
+      - build
+      - deploy
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update, or close the deduplicated failure issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          PUBLISH: ${{ needs.build.outputs.publish }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='[automation] F-Droid publication failed'
+          issue_number="$(
+            gh api --method GET "repos/$GITHUB_REPOSITORY/issues" \
+              -f state=open -f per_page=100 \
+              --jq '[.[] | select(.title == "[automation] F-Droid publication failed") | select(has("pull_request") | not)][0].number // empty'
+          )"
+
+          if [[ "$BUILD_RESULT" == "failure" || "$DEPLOY_RESULT" == "failure" ]]; then
+            body="Publication failed. Build: ${BUILD_RESULT}; deploy: ${DEPLOY_RESULT}. Run: ${RUN_URL}"
+            if [[ -n "$issue_number" ]]; then
+              gh api --method POST \
+                "repos/$GITHUB_REPOSITORY/issues/$issue_number/comments" \
+                -f body="$body" > /dev/null
+            else
+              gh api --method POST "repos/$GITHUB_REPOSITORY/issues" \
+                -f title="$title" -f body="$body" > /dev/null
+            fi
+          elif [[ "$PUBLISH" == "true" && "$DEPLOY_RESULT" == "success" && -n "$issue_number" ]]; then
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$issue_number/comments" \
+              -f body="Publication recovered successfully. Run: ${RUN_URL}" > /dev/null
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/$issue_number" \
+              -f state=closed -f state_reason=completed > /dev/null
+          else
+            echo "No failure-issue change is needed."
+          fi

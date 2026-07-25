@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local publisher output and secrets
+.env
+.fdroid/
+archive/
+build/
+dist/
+public/
+repo/
+tmp/
+*.aab
+*.apk
+*.jks
+*.keystore
+*.p12
+*.tar.gz
+*.zip
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,18 @@
+---
+repo_url: https://aldobarr.github.io/plezy-fdroid/fdroid/repo
+repo_name: Plezy
+repo_description: >-
+  Official upstream-signed Plezy Android releases, mirrored automatically
+  without rebuilding, modifying, or re-signing the APKs.
+repo_icon: fdroid-icon.png
+repo_maxage: 14
+archive_older: 0
+make_current_version_link: false
+keep_when_not_allowed: false
+apksigner: {env: FDROID_APKSIGNER_PATH}
+
+keystore: {env: FDROID_KEYSTORE_PATH}
+keystorepass: {env: FDROID_KEYSTORE_PASSWORD}
+keypass: {env: FDROID_KEY_PASSWORD}
+repo_keyalias: {env: FDROID_KEY_ALIAS}
+keydname: CN=Plezy F-Droid Repository, OU=F-Droid, O=aldobarr

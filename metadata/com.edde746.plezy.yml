@@ -1,0 +1,14 @@
+---
+AntiFeatures:
+  Tracking:
+    en-US: >-
+      Official GitHub builds enable crash reporting by default and perform
+      automatic update checks. Both can be disabled in Plezy settings.
+Categories:
+  - Multimedia
+License: GPL-3.0-only
+WebSite: https://plezy.app
+SourceCode: https://github.com/edde746/plezy
+IssueTracker: https://github.com/edde746/plezy/issues
+Changelog: https://github.com/edde746/plezy/releases
+AllowedAPKSigningKeys: 903b862cf5e3a0bfbad9b5e049ec3de703f83422bba9c5559a7b019716316e72

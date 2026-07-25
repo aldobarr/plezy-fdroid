@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="A public F-Droid repository mirroring official Plezy Android releases.">
+  <title>Plezy F-Droid Repository</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --paper: #f8f4ee;
+      --ink: #171513;
+      --muted: #665f58;
+      --line: #d9cec3;
+      --accent: #e96f4d;
+      --panel: #fffdfa;
+      --warning: #fff0c7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 10% 0%, #ffd4c5 0, transparent 32rem),
+        var(--paper);
+      color: var(--ink);
+      font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(70rem, calc(100% - 2rem)); margin: 0 auto; padding: 4rem 0; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(16rem, 25rem);
+      gap: 2rem;
+      align-items: center;
+    }
+    .brand { display: flex; align-items: center; gap: 1rem; }
+    .brand img { width: 4.5rem; height: 4.5rem; object-fit: contain; }
+    h1 { margin: 0; font-size: clamp(2.4rem, 7vw, 5.5rem); line-height: .95; letter-spacing: -.055em; }
+    .lede { max-width: 42rem; margin: 1.5rem 0; font-size: 1.2rem; color: var(--muted); }
+    .button {
+      display: inline-block;
+      padding: .85rem 1.15rem;
+      border-radius: .7rem;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 750;
+      text-decoration: none;
+    }
+    .button:focus-visible, a:focus-visible { outline: .2rem solid var(--accent); outline-offset: .2rem; }
+    .qr-card, .card {
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      box-shadow: 0 1rem 3rem rgb(80 50 30 / .08);
+    }
+    .qr-card { padding: 1.2rem; text-align: center; }
+    .qr-card img { display: block; width: min(100%, 19rem); margin: 0 auto .7rem; background: #fff; border-radius: .5rem; }
+    .qr-card p { margin: 0; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { padding: 1.35rem; }
+    .card h2 { margin: 0 0 .65rem; font-size: 1.1rem; }
+    .card p { margin: .45rem 0; }
+    .warning { background: var(--warning); }
+    code { overflow-wrap: anywhere; font-size: .82rem; }
+    a { color: inherit; text-decoration-color: var(--accent); text-decoration-thickness: .12em; }
+    .screenshot { width: 100%; max-height: 34rem; margin-top: 2rem; object-fit: cover; object-position: top; border-radius: 1rem; border: 1px solid var(--line); }
+    footer { margin-top: 2rem; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 48rem) {
+      main { padding: 2rem 0; }
+      .hero, .grid { grid-template-columns: 1fr; }
+      .qr-card { max-width: 25rem; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #171513;
+        --ink: #f8f4ee;
+        --muted: #c8bdb2;
+        --line: #4c443d;
+        --panel: #211e1b;
+        --warning: #514018;
+      }
+      body { background: radial-gradient(circle at 10% 0%, #54291f 0, transparent 32rem), var(--paper); }
+      .button { background: var(--accent); color: #171513; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <div>
+        <div class="brand">
+          <img src="assets/icon.png" alt="">
+          <p>Independent distribution channel</p>
+        </div>
+        <h1 id="page-title">Plezy for F-Droid</h1>
+        <p class="lede">
+          This public repository automatically mirrors unmodified Android APKs from
+          official Plezy releases. The APKs retain the upstream developer signature.
+        </p>
+        <a class="button" href="{{ADD_URL}}">Add repository to F-Droid</a>
+      </div>
+      <aside class="qr-card" aria-label="Repository QR code">
+        <img src="assets/repository-qr.svg" alt="QR code containing the repository URL and signing fingerprint">
+        <p>Scan with your Android device to add the repository.</p>
+      </aside>
+    </section>
+
+    <section class="grid" aria-label="Repository details">
+      <article class="card">
+        <h2>Current release</h2>
+        <p><a href="{{RELEASE_URL}}">{{RELEASE_NAME}}</a> · tag {{RELEASE_TAG}}</p>
+        <p>Published upstream: <time>{{UPSTREAM_PUBLISHED_AT}}</time></p>
+        <p>ABI version codes: {{VERSION_CODES}}</p>
+      </article>
+      <article class="card">
+        <h2>Repository identity</h2>
+        <p><a href="{{REPOSITORY_URL}}">{{REPOSITORY_URL}}</a></p>
+        <p><code>{{REPOSITORY_FINGERPRINT}}</code></p>
+      </article>
+      <article class="card">
+        <h2>APK identity</h2>
+        <p>The APK signing certificate is pinned and checked before publication.</p>
+        <p><code>{{APK_FINGERPRINT}}</code></p>
+      </article>
+      <article class="card warning">
+        <h2>Tracking disclosure</h2>
+        <p>
+          <strong>Tracking:</strong> Official GitHub builds enable crash reporting
+          by default and perform automatic update checks. Both can be disabled in
+          Plezy settings.
+        </p>
+      </article>
+    </section>
+
+    <img class="screenshot" src="assets/screenshot.png" alt="Plezy running on an Android phone">
+
+    <footer>
+      <p>
+        <a href="{{SOURCE_URL}}">Upstream source</a> ·
+        Last successful repository deployment: <time>{{LAST_DEPLOYMENT}}</time>
+      </p>
+      <p>No analytics, third-party scripts, fonts, or runtime assets are loaded.</p>
+    </footer>
+  </main>
+</body>
+</html>

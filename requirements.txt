@@ -1,0 +1,3 @@
+# Runtime tooling is deliberately pinned for repeatable repository generation.
+fdroidserver==2.4.5
+segno==1.6.6

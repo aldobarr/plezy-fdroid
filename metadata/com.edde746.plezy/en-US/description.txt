@@ -1,0 +1,12 @@
+Plezy is a modern client for browsing and playing media from Plex and
+Jellyfin servers. It provides a native Android interface for libraries,
+collections, playlists, search, downloads, live TV, and synchronized
+playback.
+
+This repository mirrors the unmodified Android APKs attached to official
+Plezy releases. Every APK retains the upstream developer signature and is
+verified before publication.
+
+Anti-feature: Tracking. Official GitHub builds enable crash reporting by
+default and perform automatic update checks. Both can be disabled in Plezy
+settings.
