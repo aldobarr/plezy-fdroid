@@ -218,7 +218,7 @@ def _validate_workflows(root: Path) -> None:
     publish_text = publish_path.read_text(encoding="utf-8")
     heartbeat_text = heartbeat_path.read_text(encoding="utf-8")
     _require(
-        'cron: "17 1,7,13,19 * * *"' in publish_text,
+        'cron: "15 0,6,12,18 * * *"' in publish_text,
         "publisher must poll four times daily at an off-peak minute",
     )
     _require(

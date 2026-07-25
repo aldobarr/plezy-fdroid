@@ -2,7 +2,7 @@ name: Publish F-Droid repository
 
 on:
   schedule:
-    - cron: "0 0,6,12,18 * * *"
+    - cron: "15 0,6,12,18 * * *"
   workflow_dispatch:
     inputs:
       force_refresh:
